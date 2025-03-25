@@ -1,0 +1,71 @@
+syntax = "proto3";
+// Import FieldMask if planning delta updates later
+// import "google/protobuf/field_mask.proto";
+
+package proto;
+
+option go_package = "./;proto"; // Specify output directory and package name
+
+// --- Basic Types ---
+// ... (Vector2, TerrainType, CompressionType) ...
+message Vector2 { float x = 1; float y = 2; }
+enum TerrainType { GRASS = 0; CLAY = 1; SAND = 2; WATER = 3; }
+enum CompressionType { NONE = 0; ZLIB = 1; }
+
+// --- World Data ---
+// ... (ColorDefinition, TerrainColorMap, WorldChunk with compression) ...
+message ColorDefinition { string hex_color = 1; }
+message TerrainColorMap { map<int32, ColorDefinition> type_to_color = 1; }
+message WorldChunk {
+  int32 chunk_x = 1;
+  int32 chunk_y = 2;
+  bytes terrain_data = 3; // Potentially compressed
+  CompressionType compression = 4;
+}
+
+// --- Entity Data ---
+// ... (EntityState - use optional or plan for deltas) ...
+message EntityState {
+  string entity_id = 1;
+  Vector2 position = 2;
+  string color_hex = 3;
+  // optional float orientation = 4;
+  // google.protobuf.FieldMask updated_fields = 100; // For standard delta
+}
+
+
+// --- Client -> Server Messages ---
+// ... (RequestChunk, PlayerInput, ClientRequest wrapper) ...
+message RequestChunk { int32 chunk_x = 1; int32 chunk_y = 2; }
+message PlayerInput { bool move_forward = 1; float turn_delta = 2; }
+message ClientRequest {
+  oneof request_type {
+    RequestChunk request_chunk = 1;
+    PlayerInput player_input = 2;
+  }
+}
+
+
+// --- Server -> Client Messages ---
+// ... (InitData, StateUpdate, ServerMessage wrapper) ...
+message InitData {
+  string your_entity_id = 1;
+  EntityState initial_state = 2;
+  TerrainColorMap color_map = 3;
+  int32 world_tile_width = 4;
+  int32 world_tile_height = 5;
+  int32 chunk_size_tiles = 6;
+  int32 tile_render_size = 7;
+}
+message StateUpdate {
+  int64 server_timestamp_ms = 1;
+  repeated EntityState entities = 2;
+  repeated string removed_entity_ids = 3;
+}
+message ServerMessage {
+  oneof message_type {
+    InitData init_data = 1;
+    WorldChunk world_chunk = 2;
+    StateUpdate state_update = 3;
+  }
+}
