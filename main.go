@@ -5,12 +5,14 @@ import (
 	"log"
 	"math/rand"
 	"net/http"
+	_ "net/http/pprof" // Import for side-effects (registers handlers)
 	"time"
 
 	"github.com/irishsmurf/go-mmo-poc/server" // Update path
 )
 
 var addr = flag.String("addr", ":8080", "http service address")
+var pprofAddr = flag.String("pprof", ":6060", "pprof http service address") // Add pprof flag
 
 func main() {
 	flag.Parse()
@@ -18,6 +20,14 @@ func main() {
 
 	hub := server.NewHub()
 	go hub.Run() // Start the hub's processing loop
+
+	// Start pprof server in a separate goroutine
+	go func() {
+		log.Printf("Starting pprof HTTP server on %s", *pprofAddr)
+		if err := http.ListenAndServe(*pprofAddr, nil); err != nil {
+			log.Fatalf("Pprof ListenAndServe error: %v", err)
+		}
+	}()
 
 	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
 		server.ServeWs(hub, w, r)

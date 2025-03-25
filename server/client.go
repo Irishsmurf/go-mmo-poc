@@ -3,6 +3,7 @@ package server
 import (
 	"log"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/irishsmurf/go-mmo-poc/game" // Update path
@@ -114,6 +115,7 @@ func (c *Client) writePump() {
 // handleClientRequest processes requests received from the client's websocket.
 func (c *Client) handleClientRequest(req *proto.ClientRequest) {
 	requestType := req.GetRequestType()
+	atomic.AddUint64(&c.hub.processedClientMessages, 1) // Increment counter
 
 	switch x := requestType.(type) {
 	case *proto.ClientRequest_RequestChunk:

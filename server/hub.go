@@ -3,9 +3,13 @@ package server
 import (
 	"bytes"
 	"log"
+	"math/rand"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
+
+	// For atomic counters
 
 	"github.com/google/uuid"
 	"github.com/irishsmurf/go-mmo-poc/game" // Update path
@@ -41,18 +45,23 @@ type Hub struct {
 	updateGrid chan *GridUpdate
 
 	// Ticker for game loop
-	ticker *time.Ticker
+	ticker                  *time.Ticker
+	processedClientMessages uint64 // Counter for incoming messages
+	sentStateUpdates        uint64 // Counter for outgoing StateUpdates
+
 }
 
 // NewHub creates a new Hub instance.
 func NewHub() *Hub {
 	return &Hub{
-		clients:     make(map[*Client]bool),
-		spatialGrid: make(map[string]map[*Client]bool),
-		register:    make(chan *Client),
-		unregister:  make(chan *Client),
-		updateGrid:  make(chan *GridUpdate),
-		ticker:      time.NewTicker(game.ServerTickRateMs * time.Millisecond),
+		clients:                 make(map[*Client]bool),
+		spatialGrid:             make(map[string]map[*Client]bool),
+		register:                make(chan *Client),
+		unregister:              make(chan *Client),
+		updateGrid:              make(chan *GridUpdate),
+		processedClientMessages: 0,
+		sentStateUpdates:        0,
+		ticker:                  time.NewTicker(game.ServerTickRateMs * time.Millisecond),
 	}
 }
 
@@ -174,7 +183,9 @@ func (h *Hub) handleGridUpdate(update *GridUpdate) {
 }
 
 func (h *Hub) runGameTick() {
-	serverTimestamp := time.Now().UnixMilli()
+	tickStart := time.Now() // Start timer
+	serverTimestamp := tickStart.UnixMilli()
+	var updatesSentThisTick uint64 = 0 // Counter for this specific tick
 
 	// Snapshot clients for safe iteration
 	h.clientsMux.RLock()
@@ -237,10 +248,26 @@ func (h *Hub) runGameTick() {
 				}
 				// Send proto (non-blocking queue)
 				c.sendProto(updateMsg)
+				atomic.AddUint64(&updatesSentThisTick, 1) // Count successful queues
 			}
 		}(client)
 	}
 	wg.Wait() // Wait for all client processing goroutines to finish
+	atomic.AddUint64(&h.sentStateUpdates, updatesSentThisTick)
+	tickDuration := time.Since(tickStart)
+	// Log metrics periodically (e.g., every 10 seconds)
+	// This should ideally be done less frequently or via a separate monitoring task
+	// For simplicity, log here occasionally:
+	if rand.Intn(100) == 0 { // Log roughly 1% of the time
+		currentProcessed := atomic.LoadUint64(&h.processedClientMessages)
+		currentSent := atomic.LoadUint64(&h.sentStateUpdates)
+		h.clientsMux.RLock()
+		clientCount := len(h.clients)
+		h.clientsMux.RUnlock()
+		log.Printf("Tick duration: %v, Clients: %d, ProcessedReq: %d, SentUpdates: %d",
+			tickDuration, clientCount, currentProcessed, currentSent)
+	}
+	// Reset counters periodically if needed for rate calculation, or use Prometheus gauges/counters
 }
 
 // Helper to parse grid key - can be moved to game package
