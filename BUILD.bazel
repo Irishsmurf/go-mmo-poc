@@ -1,0 +1,23 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
+
+# BUILD.bazel (in go-mmo-poc/)
+
+# Load Gazelle macro
+load("@bazel_gazelle//:def.bzl", "gazelle")
+
+# Gazelle target to manage BUILD files within this workspace
+gazelle(name = "gazelle")
+
+go_library(
+    name = "go-mmo-poc_lib",
+    srcs = ["main.go"],
+    importpath = "github.com/irishsmurf/go-mmo-poc",
+    visibility = ["//visibility:private"],
+    deps = ["//server"],
+)
+
+go_binary(
+    name = "go-mmo-poc",
+    embed = [":go-mmo-poc_lib"],
+    visibility = ["//visibility:public"],
+)

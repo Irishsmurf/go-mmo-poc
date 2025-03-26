@@ -1,0 +1,2 @@
+# Use the legacy WORKSPACE resolution mechanism
+build --enable_workspace

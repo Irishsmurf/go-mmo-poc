@@ -1,0 +1,23 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
+
+go_library(
+    name = "client-ebitengine_lib",
+    srcs = ["client.go"],
+    importpath = "github.com/irishsmurf/go-mmo-poc/client-ebitengine",
+    visibility = ["//visibility:private"],
+    deps = [
+        "@com_github_gorilla_websocket//:go_default_library",
+        "@com_github_hajimehoshi_ebiten_v2//:go_default_library",
+        "@com_github_hajimehoshi_ebiten_v2//ebitenutil:go_default_library",
+        "@com_github_hajimehoshi_ebiten_v2//inpututil:go_default_library",
+        "@com_github_hajimehoshi_ebiten_v2//vector:go_default_library",
+        "@com_github_irishsmurf_go_mmo_poc//proto:go_default_library",
+        "@org_golang_google_protobuf//proto:go_default_library",
+    ],
+)
+
+go_binary(
+    name = "client-ebitengine",
+    embed = [":client-ebitengine_lib"],
+    visibility = ["//visibility:public"],
+)
