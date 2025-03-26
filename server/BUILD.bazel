@@ -1,0 +1,19 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "server",
+    srcs = [
+        "client.go",
+        "hub.go",
+        "server.go",
+    ],
+    importpath = "github.com/irishsmurf/go-mmo-poc/server",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//game",
+        "//proto:mmo_go_proto",
+        "@com_github_google_uuid//:uuid",
+        "@com_github_gorilla_websocket//:websocket",
+        "@org_golang_google_protobuf//proto",
+    ],
+)

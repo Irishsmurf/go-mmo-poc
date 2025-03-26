@@ -1,0 +1,9 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "game",
+    srcs = ["game.go"],
+    importpath = "github.com/irishsmurf/go-mmo-poc/game",
+    visibility = ["//visibility:public"],
+    deps = ["//proto:mmo_go_proto"],
+)

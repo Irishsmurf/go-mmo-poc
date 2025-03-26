@@ -1,0 +1,19 @@
+# BUILD.bazel (in go-mmo-poc/)
+load("@gazelle//:def.bzl", "gazelle")
+load("@rules_go//go:def.bzl", "go_binary", "go_library")
+
+gazelle(name = "gazelle")
+
+go_library(
+    name = "go-mmo-poc_lib",
+    srcs = ["main.go"],
+    importpath = "github.com/irishsmurf/go-mmo-poc",
+    visibility = ["//visibility:private"],
+    deps = ["//server"],
+)
+
+go_binary(
+    name = "go-mmo-poc",
+    embed = [":go-mmo-poc_lib"],
+    visibility = ["//visibility:public"],
+)
