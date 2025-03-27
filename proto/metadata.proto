@@ -1,0 +1,36 @@
+syntax = "proto3";
+
+package proto;
+
+option go_package = "./;proto"; // Same output dir as mmo.proto
+
+// --- Service Definition ---
+
+service MetadataService {
+  // Get display name for a given player ID
+  rpc GetPlayerName (GetPlayerNameRequest) returns (GetPlayerNameResponse);
+  // Set/Update display name for a player ID (e.g., on creation or change)
+  rpc SetPlayerName (SetPlayerNameRequest) returns (SetPlayerNameResponse);
+  // Maybe add: Get other player profile info, friends lists etc.
+}
+
+// --- Message Definitions ---
+
+message GetPlayerNameRequest {
+  string player_id = 1;
+}
+
+message GetPlayerNameResponse {
+  string player_id = 1;
+  string display_name = 2; // The name found (or default if not set)
+  bool found = 3;          // Indicate if a specific name was found for this ID
+}
+
+message SetPlayerNameRequest {
+  string player_id = 1;
+  string display_name = 2;
+}
+
+message SetPlayerNameResponse {
+  bool success = 1; // Indicate if setting was successful
+}

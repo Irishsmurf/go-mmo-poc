@@ -1,0 +1,23 @@
+load("@rules_go//go:def.bzl", "go_binary", "go_library")
+
+go_library(
+    name = "metadata-server_lib",
+    srcs = ["main.go"],
+    importpath = "github.com/irishsmurf/go-mmo-poc/metadata-server",
+    visibility = ["//visibility:private"],
+    deps = [
+        "@org_golang_google_grpc//:grpc",
+        "@org_golang_google_grpc//codes",
+        "@org_golang_google_grpc//reflection",
+        "@org_golang_google_grpc//status",
+    ],
+)
+
+go_binary(
+    name = "metadata-server",
+    embed = [":metadata-server_lib"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//proto:mmo_go_proto",
+    ]
+)

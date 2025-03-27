@@ -11,7 +11,6 @@ go_library(
         "@com_github_hajimehoshi_ebiten_v2//ebitenutil",
         "@com_github_hajimehoshi_ebiten_v2//inpututil",
         "@com_github_hajimehoshi_ebiten_v2//vector",
-        "//proto:mmo_go_proto",
         "@org_golang_google_protobuf//proto",
     ],
 )

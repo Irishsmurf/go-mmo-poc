@@ -13,12 +13,13 @@ import (
 
 var addr = flag.String("addr", ":8080", "http service address")
 var pprofAddr = flag.String("pprof", ":6060", "pprof http service address") // Add pprof flag
+var metadataAddr = flag.String("metadata", ":50051", "metadata gRPC service address")
 
 func main() {
 	flag.Parse()
 	rand.Seed(time.Now().UnixNano()) // Seed random number generator
 
-	hub := server.NewHub()
+	hub := server.NewHub(*metadataAddr)
 	go hub.Run() // Start the hub's processing loop
 
 	// Start pprof server in a separate goroutine

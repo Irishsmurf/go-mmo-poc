@@ -2,6 +2,7 @@ package server
 
 import (
 	"bytes"
+	"context"
 	"log"
 	"math/rand"
 	"strconv"
@@ -14,6 +15,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/irishsmurf/go-mmo-poc/game" // Update path
 	"github.com/irishsmurf/go-mmo-poc/proto"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 // GridUpdate struct to pass grid changes via channel
@@ -49,10 +52,26 @@ type Hub struct {
 	processedClientMessages uint64 // Counter for incoming messages
 	sentStateUpdates        uint64 // Counter for outgoing StateUpdates
 
+	metadataClient proto.MetadataServiceClient
+	grpcConn       *grpc.ClientConn
 }
 
 // NewHub creates a new Hub instance.
-func NewHub() *Hub {
+func NewHub(metadataServiceAddr string) *Hub {
+
+	opts := []grpc.DialOption{
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+	}
+	conn, err := grpc.Dial(metadataServiceAddr, opts...)
+	if err != nil {
+		log.Fatalf("Failed to connect to metadata service: %v", err)
+	}
+
+	var metaClient proto.MetadataServiceClient
+	if conn != nil {
+		metaClient = proto.NewMetadataServiceClient(conn)
+	}
+
 	return &Hub{
 		clients:                 make(map[*Client]bool),
 		spatialGrid:             make(map[string]map[*Client]bool),
@@ -62,6 +81,8 @@ func NewHub() *Hub {
 		processedClientMessages: 0,
 		sentStateUpdates:        0,
 		ticker:                  time.NewTicker(game.ServerTickRateMs * time.Millisecond),
+		metadataClient:          metaClient,
+		grpcConn:                conn,
 	}
 }
 
@@ -70,6 +91,10 @@ func (h *Hub) Run() {
 	log.Println("Hub started")
 	defer func() {
 		h.ticker.Stop()
+		if h.grpcConn != nil {
+			h.grpcConn.Close()
+			log.Println("Metadata gRPC connection closed")
+		}
 		log.Println("Hub stopped")
 	}()
 	for {
@@ -97,6 +122,39 @@ func (h *Hub) handleRegister(client *Client) {
 	// Assign ID and initial state
 	client.playerID = "player_" + uuid.New().String()[:8]
 	client.state = game.CreateInitialState(client.playerID)
+
+	// Metadata Server stuff
+	var displayName = "Player_" + client.playerID[:4]
+	if h.metadataClient != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		getResp, err := h.metadataClient.GetPlayerName(
+			ctx, &proto.GetPlayerNameRequest{PlayerId: client.playerID},
+		)
+		cancel()
+
+		if err == nil && getResp.Found {
+			displayName = getResp.DisplayName
+			log.Printf("Retrieved player name from metadata service. ID: %s, Name: %s", client.playerID, displayName)
+		} else {
+			if err != nil {
+				log.Printf("Failed to retrieve player name from metadata service. ID: %s, Error: %v", client.playerID, err)
+			}
+
+			ctxSet, cancelSet := context.WithTimeout(context.Background(), 2*time.Second)
+			setResp, errSet := h.metadataClient.SetPlayerName(
+				ctxSet, &proto.SetPlayerNameRequest{PlayerId: client.playerID, DisplayName: displayName},
+			)
+			cancelSet()
+			if errSet != nil {
+				log.Printf("Failed to set player name in metadata service. ID: %s, Name: %s, Error: %v")
+			} else if setResp.Success {
+				log.Printf("Set default player name via Metadata service")
+			}
+		}
+	} else {
+		log.Print("Metadata client not available")
+	}
+
 	client.gridCX, client.gridCY = game.GetGridCellCoords(client.state.Position.X, client.state.Position.Y)
 
 	log.Printf("Player %s registered in grid %d,%d", client.playerID, client.gridCX, client.gridCY)

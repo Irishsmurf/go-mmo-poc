@@ -21,6 +21,7 @@ use_repo(
     "com_github_google_uuid",
     "com_github_gorilla_websocket",
     "com_github_hajimehoshi_ebiten_v2",
+    "org_golang_google_grpc",
     "org_golang_google_protobuf",
 )
 
