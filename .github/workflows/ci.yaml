@@ -1,0 +1,179 @@
+name: Go MMO CI
+
+on:
+  push:
+    branches: [ "main", "master" ] # Trigger on pushes to main branches
+  pull_request:
+    branches: [ "main", "master" ] # Trigger on PRs targeting main branches
+
+jobs:
+  lint-format:
+    name: Lint & Format Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21' # Match version used in MODULE.bazel or go.mod
+
+      - name: Check Formatting
+        run: |
+          # go fmt $(go list ./... | grep -v /vendor/) # Check standard Go formatting
+          # Alternative using gofumpt (stricter)
+          go install mvdan.cc/gofumpt@latest
+          gofumpt -l -w . # List files and write changes (fail if any changes)
+          # Check if gofumpt made changes (indicates formatting issues)
+          git diff --exit-code || (echo "Code is not formatted with gofumpt." && exit 1)
+
+      - name: Go Lint (golangci-lint)
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: v1.56 # Or latest stable version
+          args: --timeout=5m # Increase timeout if needed
+
+  test:
+    name: Unit & Integration Tests
+    runs-on: ubuntu-latest
+    needs: lint-format # Run after linting
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+          cache: false # Bazel manages its own Go cache/toolchain
+
+      - name: Set up Bazel
+        uses: bazelbuild/setup-bazel@v1 # Check for latest version
+        # Optionally pin bazel version:
+        # with:
+        #   version: 7.x.x # Or your required version
+
+      - name: Install Protoc
+        uses: arduino/setup-protoc@v3 # Check for latest version
+        with:
+           version: '25.x' # Or your required protoc version
+
+      - name: Install Go Protobuf/gRPC plugins
+        run: |
+          go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+          go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+          echo "$(go env GOPATH)/bin" >> $GITHUB_PATH # Add Go bin to PATH
+
+      - name: Mount Bazel cache (Optional but Recommended)
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/bazel
+            ~/.cache/bazel/_bazel_${{ runner.os }}
+          key: bazel-cache-${{ runner.os }}-${{ github.sha }}
+          restore-keys: |
+            bazel-cache-${{ runner.os }}-
+
+      # --- Run Tests via Bazel ---
+      # Assumes you have go_test targets defined (Gazelle helps create these)
+      - name: Run Bazel Tests
+        run: bazel test //... --test_output=errors
+
+      # --- Optional: Run Integration Tests ---
+      # This is more complex. You might need to:
+      # 1. Build server binaries: bazel build //main:mmo-server //metadata-server:metadata-server
+      # 2. Start servers in background: ./bazel-bin/metadata-server/metadata-server & ./bazel-bin/main/mmo-server &
+      # 3. Run integration test scripts/code that connects to the servers.
+      # 4. Stop servers.
+      # Consider using Docker Compose for managing service dependencies during integration tests.
+      # - name: Run Integration Tests
+      #   run: |
+      #     echo "Integration tests not yet implemented in this workflow"
+      #     # ./scripts/run_integration_tests.sh
+
+  build:
+    name: Build Binaries (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    needs: test # Run after tests pass
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest] # Example platforms
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go # Needed for Gazelle/plugins even if Bazel has its own SDK
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+          cache: false
+
+      - name: Set up Bazel
+        uses: bazelbuild/setup-bazel@v1
+
+      - name: Install Protoc
+        uses: arduino/setup-protoc@v3
+        with:
+           version: '25.x'
+
+      - name: Install Go Protobuf/gRPC plugins
+        run: |
+          go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+          go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+          echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
+
+      - name: Mount Bazel cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/bazel
+            ~/.cache/bazel/_bazel_${{ runner.os }}
+            # On Windows paths might differ, check cache action docs
+          key: bazel-cache-${{ runner.os }}-${{ github.sha }}
+          restore-keys: |
+            bazel-cache-${{ runner.os }}-
+
+      # --- Install Ebiten Build Dependencies (Linux Only example) ---
+      - name: Install Ebiten Linux Deps
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y --no-install-recommends \
+            libxrandr-dev libxcursor-dev libxi-dev libxinerama-dev \
+            libxxf86vm-dev libgl1-mesa-dev libgles2-mesa-dev xorg-dev libasound2-dev
+
+      # Add similar steps for macOS (Xcode CLI tools usually enough) or Windows (MinGW/GCC) if needed
+
+      # --- Build Targets ---
+      - name: Build Server (Metadata)
+        run: bazel build //metadata-server:metadata-server
+
+      - name: Build Server (Game)
+        run: bazel build //main:mmo-server
+
+      - name: Build Client (Ebitengine)
+        # This might fail on runners without full graphics setup/drivers,
+        # especially macOS/Windows CI runners. Consider building only on Linux
+        # or accepting that graphical client build might not work everywhere in CI.
+        if: runner.os == 'Linux' # Example: Only build graphical client on Linux CI
+        run: bazel build //client-ebitengine:mmo-client-ebitengine
+
+      # --- Optional: Upload Artifacts ---
+      # Store built binaries for later use (e.g., deployment, releases)
+      - name: Upload Server Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: mmo-servers-${{ matrix.os }}
+          path: |
+            bazel-bin/main/mmo-server*
+            bazel-bin/metadata-server/metadata-server*
+          if-no-files-found: error # Fail if build didn't produce output
+
+      - name: Upload Client Artifact
+        if: runner.os == 'Linux' # Only upload if built
+        uses: actions/upload-artifact@v4
+        with:
+          name: mmo-client-${{ matrix.os }}
+          path: bazel-bin/client-ebitengine/mmo-client-ebitengine*
+          if-no-files-found: error
