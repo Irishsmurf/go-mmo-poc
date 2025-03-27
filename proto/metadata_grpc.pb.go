@@ -19,8 +19,10 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	MetadataService_GetPlayerName_FullMethodName = "/proto.MetadataService/GetPlayerName"
-	MetadataService_SetPlayerName_FullMethodName = "/proto.MetadataService/SetPlayerName"
+	MetadataService_GetPlayerName_FullMethodName   = "/proto.MetadataService/GetPlayerName"
+	MetadataService_SetPlayerName_FullMethodName   = "/proto.MetadataService/SetPlayerName"
+	MetadataService_SetPlayerStatus_FullMethodName = "/proto.MetadataService/SetPlayerStatus"
+	MetadataService_GetPlayerStatus_FullMethodName = "/proto.MetadataService/GetPlayerStatus"
 )
 
 // MetadataServiceClient is the client API for MetadataService service.
@@ -31,6 +33,8 @@ type MetadataServiceClient interface {
 	GetPlayerName(ctx context.Context, in *GetPlayerNameRequest, opts ...grpc.CallOption) (*GetPlayerNameResponse, error)
 	// Set/Update display name for a player ID (e.g., on creation or change)
 	SetPlayerName(ctx context.Context, in *SetPlayerNameRequest, opts ...grpc.CallOption) (*SetPlayerNameResponse, error)
+	SetPlayerStatus(ctx context.Context, in *SetPlayerStatusRequest, opts ...grpc.CallOption) (*SetPlayerStatusResponse, error)
+	GetPlayerStatus(ctx context.Context, in *GetPlayerStatusRequest, opts ...grpc.CallOption) (*GetPlayerStatusResponse, error)
 }
 
 type metadataServiceClient struct {
@@ -61,6 +65,26 @@ func (c *metadataServiceClient) SetPlayerName(ctx context.Context, in *SetPlayer
 	return out, nil
 }
 
+func (c *metadataServiceClient) SetPlayerStatus(ctx context.Context, in *SetPlayerStatusRequest, opts ...grpc.CallOption) (*SetPlayerStatusResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SetPlayerStatusResponse)
+	err := c.cc.Invoke(ctx, MetadataService_SetPlayerStatus_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *metadataServiceClient) GetPlayerStatus(ctx context.Context, in *GetPlayerStatusRequest, opts ...grpc.CallOption) (*GetPlayerStatusResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetPlayerStatusResponse)
+	err := c.cc.Invoke(ctx, MetadataService_GetPlayerStatus_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // MetadataServiceServer is the server API for MetadataService service.
 // All implementations must embed UnimplementedMetadataServiceServer
 // for forward compatibility.
@@ -69,6 +93,8 @@ type MetadataServiceServer interface {
 	GetPlayerName(context.Context, *GetPlayerNameRequest) (*GetPlayerNameResponse, error)
 	// Set/Update display name for a player ID (e.g., on creation or change)
 	SetPlayerName(context.Context, *SetPlayerNameRequest) (*SetPlayerNameResponse, error)
+	SetPlayerStatus(context.Context, *SetPlayerStatusRequest) (*SetPlayerStatusResponse, error)
+	GetPlayerStatus(context.Context, *GetPlayerStatusRequest) (*GetPlayerStatusResponse, error)
 	mustEmbedUnimplementedMetadataServiceServer()
 }
 
@@ -84,6 +110,12 @@ func (UnimplementedMetadataServiceServer) GetPlayerName(context.Context, *GetPla
 }
 func (UnimplementedMetadataServiceServer) SetPlayerName(context.Context, *SetPlayerNameRequest) (*SetPlayerNameResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SetPlayerName not implemented")
+}
+func (UnimplementedMetadataServiceServer) SetPlayerStatus(context.Context, *SetPlayerStatusRequest) (*SetPlayerStatusResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SetPlayerStatus not implemented")
+}
+func (UnimplementedMetadataServiceServer) GetPlayerStatus(context.Context, *GetPlayerStatusRequest) (*GetPlayerStatusResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetPlayerStatus not implemented")
 }
 func (UnimplementedMetadataServiceServer) mustEmbedUnimplementedMetadataServiceServer() {}
 func (UnimplementedMetadataServiceServer) testEmbeddedByValue()                         {}
@@ -142,6 +174,42 @@ func _MetadataService_SetPlayerName_Handler(srv interface{}, ctx context.Context
 	return interceptor(ctx, in, info, handler)
 }
 
+func _MetadataService_SetPlayerStatus_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SetPlayerStatusRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MetadataServiceServer).SetPlayerStatus(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: MetadataService_SetPlayerStatus_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MetadataServiceServer).SetPlayerStatus(ctx, req.(*SetPlayerStatusRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _MetadataService_GetPlayerStatus_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetPlayerStatusRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MetadataServiceServer).GetPlayerStatus(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: MetadataService_GetPlayerStatus_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MetadataServiceServer).GetPlayerStatus(ctx, req.(*GetPlayerStatusRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // MetadataService_ServiceDesc is the grpc.ServiceDesc for MetadataService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -156,6 +224,14 @@ var MetadataService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "SetPlayerName",
 			Handler:    _MetadataService_SetPlayerName_Handler,
+		},
+		{
+			MethodName: "SetPlayerStatus",
+			Handler:    _MetadataService_SetPlayerStatus_Handler,
+		},
+		{
+			MethodName: "GetPlayerStatus",
+			Handler:    _MetadataService_GetPlayerStatus_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

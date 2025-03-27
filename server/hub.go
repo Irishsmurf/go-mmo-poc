@@ -6,6 +6,7 @@ import (
 	"log"
 	"math/rand"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -127,6 +128,20 @@ func (h *Hub) handleRegister(client *Client) {
 	var displayName = "Player_" + client.playerID[:4]
 	if h.metadataClient != nil {
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+
+		_, err := h.metadataClient.SetPlayerStatus(
+			ctx, &proto.SetPlayerStatusRequest{
+				PlayerId: client.playerID,
+				Status:   proto.OnlineStatus_STATUS_ONLINE,
+			})
+		cancel()
+
+		if err != nil {
+			log.Printf("Failed to set player status in metadata service. ID: %s, Error: %v", client.playerID, err)
+		} else {
+			log.Printf("Set player status to online in metadata service. ID: %s", client.playerID)
+		}
+
 		getResp, err := h.metadataClient.GetPlayerName(
 			ctx, &proto.GetPlayerNameRequest{PlayerId: client.playerID},
 		)
@@ -200,13 +215,28 @@ func (h *Hub) handleRegister(client *Client) {
 
 func (h *Hub) handleUnregister(client *Client) {
 	h.clientsMux.Lock()
-	_, ok := h.clients[client]
-	if ok {
+
+	if _, ok := h.clients[client]; ok {
 		delete(h.clients, client)
-		close(client.send) // Close send channel to stop writePump
+		close(client.send) // Close send channel to stop writePump)
 		log.Printf("Player %s unregistered", client.playerID)
 	}
-	h.clientsMux.Unlock()
+
+	if h.metadataClient != nil && client.playerID != "" && !strings.HasPrefix(client.playerID, "pending_") {
+		ctxStatus, cancelStatus := context.WithTimeout(context.Background(), 5*time.Second)
+		_, err := h.metadataClient.SetPlayerStatus(
+			ctxStatus, &proto.SetPlayerStatusRequest{
+				PlayerId: client.playerID,
+				Status:   proto.OnlineStatus_STATUS_OFFLINE,
+			})
+		cancelStatus()
+
+		if err != nil {
+			log.Printf("Failed to set player status to offline in metadata service. ID: %s, Error: %v", client.playerID, err)
+		} else {
+			log.Printf("Set player status to offline in metadata service. ID: %s", client.playerID)
+		}
+	}
 
 	// Remove from spatial grid
 	h.spatialGridMux.Lock()

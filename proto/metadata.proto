@@ -4,6 +4,15 @@ package proto;
 
 option go_package = "./;proto"; // Same output dir as mmo.proto
 
+// Enums
+
+enum OnlineStatus {
+    STATUS_UNKNOWN = 0;
+    STATUS_OFFLINE = 1;
+    STATUS_ONLINE = 2;
+    STATUS_AWAY = 3;
+}
+
 // --- Service Definition ---
 
 service MetadataService {
@@ -11,7 +20,9 @@ service MetadataService {
   rpc GetPlayerName (GetPlayerNameRequest) returns (GetPlayerNameResponse);
   // Set/Update display name for a player ID (e.g., on creation or change)
   rpc SetPlayerName (SetPlayerNameRequest) returns (SetPlayerNameResponse);
-  // Maybe add: Get other player profile info, friends lists etc.
+
+  rpc SetPlayerStatus (SetPlayerStatusRequest) returns (SetPlayerStatusResponse);
+  rpc GetPlayerStatus (GetPlayerStatusRequest) returns (GetPlayerStatusResponse);
 }
 
 // --- Message Definitions ---
@@ -33,4 +44,27 @@ message SetPlayerNameRequest {
 
 message SetPlayerNameResponse {
   bool success = 1; // Indicate if setting was successful
+}
+
+message SetPlayerStatusRequest {
+    string player_id = 1;
+    OnlineStatus status = 2;
+}
+
+message SetPlayerStatusResponse {
+    bool success = 1;
+}
+
+message PlayerStatusInfo {
+    string player_id = 1;
+    OnlineStatus status = 2;
+    int64 last_seen_timestamp_ms = 3;
+}
+
+message GetPlayerStatusRequest {
+    repeated string player_ids = 1;
+}
+
+message GetPlayerStatusResponse {
+    map<string, PlayerStatusInfo> statuses = 1;
 }
